@@ -1,0 +1,17 @@
+username = "bunsim"
+password = "fc9dfc3d"
+
+[endpoints.small]
+url = "https://bing.com"
+iterations = 10
+avg_interval = 5
+
+[endpoints.big_google]
+url = "https://dl.google.com/android/studio/maven-google-com/stable/offline-gmaven-stable.zip"
+iterations = 1
+avg_interval = 5
+
+[endpoints.big_hetzner]
+url = "http://speed.hetzner.de/1GB.bin"
+iterations = 1
+avg_interval = 5
