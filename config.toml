@@ -4,7 +4,7 @@ password = "testing"
 
 [endpoints.small]
 url = "https://bing.com"
-iterations = 10
+iterations = 1
 avg_interval = 5
 
 #endpoints.big_google]
@@ -12,7 +12,7 @@ avg_interval = 5
 #iterations = 1
 #avg_interval = 5
 
-[endpoints.big_hetzner]
-url = "http://speed.hetzner.de/100MB.bin"
-iterations = 1
-avg_interval = 5
+#[endpoints.big_hetzner]
+#url = "http://speed.hetzner.de/100MB.bin"
+#iterations = 1
+#avg_interval = 5
