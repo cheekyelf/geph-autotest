@@ -1,4 +1,4 @@
-collector = "127.0.0.1:8080"
+collector = "http://127.0.0.1:8080"
 username = "bunsim"
 password = "fc9dfc3d"
 
