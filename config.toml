@@ -4,7 +4,7 @@ password = "testing"
 
 [endpoints.small]
 url = "https://bing.com"
-iterations = 1
+iterations = 10
 avg_interval = 5
 
 #endpoints.big_google]
