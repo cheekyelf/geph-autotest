@@ -1,6 +1,4 @@
 collector = "http://127.0.0.1:8080/incoming_data"
-username = "autotest"
-password = "testing"
 
 [endpoints.small]
 url = "https://bing.com"
