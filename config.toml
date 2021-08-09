@@ -1,4 +1,4 @@
-collector = "http://127.0.0.1:8080/incoming_data"
+collector = "http://194.182.167.15/"
 
 [endpoints.small]
 url = "https://bing.com"
