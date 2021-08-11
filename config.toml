@@ -1,10 +1,10 @@
 collector = "http://194.182.167.15/incoming_data"
-global_interval = 1
+global_interval = 0
 
 [endpoints.small]
 url = "https://bing.com"
-iterations = 10
-interval = 5
+iterations = 1
+interval = 0
 
 #endpoints.big_google]
 #url = "https://dl.google.com/android/studio/maven-google-com/stable/offline-gmaven-stable.zip"
