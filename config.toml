@@ -1,4 +1,4 @@
-collector = "http://194.182.167.15/incoming_data"
+collector = "https://194.182.167.15.nip.io/incoming_data"
 global_interval = 10
 
 [endpoints.small]
