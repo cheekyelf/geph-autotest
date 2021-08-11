@@ -1,5 +1,5 @@
 collector = "http://194.182.167.15/incoming_data"
-global_interval = 3600
+global_interval = 1
 
 [endpoints.small]
 url = "https://bing.com"
