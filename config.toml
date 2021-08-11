@@ -1,9 +1,9 @@
 collector = "http://194.182.167.15/incoming_data"
-global_interval = 0
+global_interval = 10
 
 [endpoints.small]
 url = "https://bing.com"
-iterations = 1
+iterations = 5
 interval = 0
 
 #endpoints.big_google]
