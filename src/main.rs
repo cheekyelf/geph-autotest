@@ -211,9 +211,9 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
                 eprintln!("OH NO RETRYING!!!!!!");
                 // child.kill().unwrap();
                 child.wait().unwrap();
-                continue;
+                break;
             }
-            // dbg!(&line);
+            dbg!(&line);
             if line.contains("TUNNEL_MANAGER MAIN LOOP") {
                 std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
                 return (child, exit.hostname, is_plus);
