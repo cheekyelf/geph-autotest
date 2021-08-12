@@ -83,8 +83,10 @@ fn main() -> anyhow::Result<()> {
         let start = Instant::now();
         let (mut child, exit, is_plus) = connect_to_geph(username.clone(), password.clone());
         scopeguard::defer!({
+            let pid = child.id();
             child.kill().unwrap();
             child.wait().unwrap();
+            eprintln!("KILLLLLED!!!!! pid = {}", pid);
         });
         let time_to_connect = start.elapsed().as_millis();
 
