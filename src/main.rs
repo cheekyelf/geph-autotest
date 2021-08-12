@@ -187,9 +187,9 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
 
     // Randomly pick an exit
     let exit = exit_list[fastrand::usize(..exit_list.len())].clone();
-
-    // Connect to Geph with our exit
-    let mut child = Command::new("sh")
+    loop {
+        // Connect to Geph with our exit
+        let mut child = Command::new("sh")
         .arg("-c")
         .arg(&format!(
             "geph4-client connect --username {} --password {} --exit-server {} --http-listen 127.0.0.1:10910 --socks5-listen 127.0.0.1:10909 --stats-listen 127.0.0.1:10809",
@@ -199,21 +199,25 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
         .spawn()
         .expect("could not connect to geph");
 
-    let stderr = child.stderr.take().expect("could not get child stderr");
-    let mut stderr = BufReader::new(stderr);
-    let mut line = String::new();
-    loop {
-        line.clear();
-        let n = stderr
-            .read_line(&mut line)
-            .expect("could not read from child stderr");
-        if n == 0 {
-            panic!("OH NO DED!")
-        }
-        // dbg!(&line);
-        if line.contains("TUNNEL_MANAGER MAIN LOOP") {
-            std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
-            return (child, exit.hostname, is_plus);
+        let stderr = child.stderr.take().expect("could not get child stderr");
+        let mut stderr = BufReader::new(stderr);
+        let mut line = String::new();
+        loop {
+            line.clear();
+            let n = stderr
+                .read_line(&mut line)
+                .expect("could not read from child stderr");
+            if n == 0 {
+                eprintln!("OH NO RETRYING!!!!!!");
+                child.kill().unwrap();
+                child.wait().unwrap();
+                continue;
+            }
+            // dbg!(&line);
+            if line.contains("TUNNEL_MANAGER MAIN LOOP") {
+                std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
+                return (child, exit.hostname, is_plus);
+            }
         }
     }
 }
