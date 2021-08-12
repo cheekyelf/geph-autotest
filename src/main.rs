@@ -204,9 +204,12 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
     let mut line = String::new();
     loop {
         line.clear();
-        stderr
+        let n = stderr
             .read_line(&mut line)
             .expect("could not read from child stderr");
+        if n == 0 {
+            panic!("OH NO DED!")
+        }
         // dbg!(&line);
         if line.contains("TUNNEL_MANAGER MAIN LOOP") {
             std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
