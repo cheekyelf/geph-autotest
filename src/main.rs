@@ -207,7 +207,7 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
         stderr
             .read_line(&mut line)
             .expect("could not read from child stderr");
-        dbg!(&line);
+        // dbg!(&line);
         if line.contains("TUNNEL_MANAGER MAIN LOOP") {
             std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
             return (child, exit.hostname, is_plus);
