@@ -1,0 +1,19 @@
+# A sample config file
+
+collector = "labooyah.be"
+global_invertal = 3600
+
+[endpoints.small]
+url = "http://geph_test_files/smo.txt"
+iterations = 10
+avg_interval = 5
+
+[endpoints.big_google]
+url = "http://geph_test_files/big_google.txt"
+iterations = 1
+interval = 5
+
+[endpoints.big_nongoogle]
+url = "http://geph_test_files/big_nongoogle.txt"
+iterations = 1
+interval = 5
