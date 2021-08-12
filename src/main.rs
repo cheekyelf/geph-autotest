@@ -209,7 +209,7 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
                 .expect("could not read from child stderr");
             if n == 0 {
                 eprintln!("OH NO RETRYING!!!!!!");
-                child.kill().unwrap();
+                // child.kill().unwrap();
                 child.wait().unwrap();
                 continue;
             }
