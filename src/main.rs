@@ -199,6 +199,8 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
             .arg("127.0.0.1:10909")
             .arg("--stats-listen")
             .arg("127.0.0.1:10809")
+            .arg("--credential-cache")
+            .arg("/tmp/manual")
             .stderr(Stdio::piped())
             .spawn()
             .expect("could not connect to geph");
