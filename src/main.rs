@@ -150,12 +150,6 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
         .arg(username.clone())
         .arg("--password")
         .arg(password.clone())
-        // .arg("--http-listen")
-        // .arg("10910")
-        // .arg("--socks5-listen")
-        // .arg("10909")
-        // .arg("--stats-listen")
-        // .arg("10809")
         .stdout(Stdio::piped())
         .spawn()
         .expect("spawning geph4-client failed");
@@ -191,15 +185,24 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
     let exit = exit_list[fastrand::usize(..exit_list.len())].clone();
     loop {
         // Connect to Geph with our exit
-        let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(&format!(
-            "geph4-client connect --username {} --password {} --exit-server {} --http-listen 127.0.0.1:10910 --socks5-listen 127.0.0.1:10909 --stats-listen 127.0.0.1:10809",
-            username, password, exit.hostname
-        ))
-        .stderr(Stdio::piped())
-        .spawn()
-        .expect("could not connect to geph");
+        let mut child = Command::new("geph4-client")
+            .arg("connect")
+            .arg("--username")
+            .arg(&username)
+            .arg("--password")
+            .arg(&password)
+            .arg("--exit-server")
+            .arg(&exit.hostname)
+            .arg("--http-listen")
+            .arg("127.0.0.1:10910")
+            .arg("--socks5-listen")
+            .arg("127.0.0.1:10909")
+            .arg("--stats-listen")
+            .arg("127.0.0.1:10809")
+            .stderr(Stdio::piped())
+            .spawn()
+            .expect("could not connect to geph");
+        eprintln!("STARTING CHILD WITH PID = {}", child.id());
 
         let stderr = child.stderr.take().expect("could not get child stderr");
         let mut stderr = BufReader::new(stderr);
@@ -213,6 +216,7 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
                 eprintln!("OH NO RETRYING!!!!!!");
                 // child.kill().unwrap();
                 child.wait().unwrap();
+                std::thread::sleep(Duration::from_secs(1));
                 break;
             }
             dbg!(&line);
@@ -235,7 +239,7 @@ fn run(command: &str) -> anyhow::Result<Vec<u8>> {
     eprintln!("running command {}", command);
     let output = child.wait_with_output()?;
 
-    return Ok(output.stdout);
+    Ok(output.stdout)
 }
 
 fn measure_time(
