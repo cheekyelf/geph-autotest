@@ -30,15 +30,20 @@ struct TestDescriptor {
     interval: u64,   // how many seconds to wait after each download
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone)]
 struct ResultStruct {
     exit: String,
     is_plus: bool,
     time_to_connect: u128,
-    data: HashMap<String, Vec<MeasurementStruct>>,
+    data_error: DataOrError,
+}
+#[derive(Serialize, Clone)]
+enum DataOrError {
+    Data(HashMap<String, Vec<MeasurementStruct>>),
+    Error(String),
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Clone, Copy)]
 struct MeasurementStruct {
     download_time: u128,
     timestamp: u64,
@@ -94,7 +99,7 @@ fn main() -> anyhow::Result<()> {
             exit,
             is_plus,
             time_to_connect,
-            data: HashMap::new(),
+            data_error: DataOrError::Data(HashMap::new()),
         };
 
         // Fetch testing configuration document into a hashmap
@@ -123,14 +128,21 @@ fn main() -> anyhow::Result<()> {
                         });
                     }
                     Err(e) => {
-                        ureq::post(&config.collector).send_string(&format!("Failure: {}", e))?;
+                        result_struct.data_error = DataOrError::Error(e.to_string());
                         break;
                     }
                 }
                 // Wait a random number of seconds that averages to avg_indi
                 std::thread::sleep(Duration::from_secs(fastrand::u64(0..=(td.interval * 2))));
             }
-            result_struct.data.insert(name, result_vec);
+            match &mut result_struct.data_error {
+                DataOrError::Data(datamap) => {
+                    datamap.insert(name, result_vec);
+                }
+                DataOrError::Error(_) => {
+                    break;
+                }
+            }
         }
         // Send result to data aggregation server
         let json_str =
