@@ -83,10 +83,10 @@ fn main() -> anyhow::Result<()> {
         let start = Instant::now();
         let (mut child, exit, is_plus) = connect_to_geph(username.clone(), password.clone());
         scopeguard::defer!({
-            let pid = child.id();
+            //let pid = child.id();
             child.kill().unwrap();
             child.wait().unwrap();
-            eprintln!("KILLLLLED!!!!! pid = {}", pid);
+            //eprintln!("KILLLLLED!!!!! pid = {}", pid);
         });
         let time_to_connect = start.elapsed().as_millis();
 
@@ -110,30 +110,35 @@ fn main() -> anyhow::Result<()> {
             for _ in 0..=td.iterations {
                 let duration = measure_time(|| {
                     run(&format!(
-                        "curl --proxy socks5h://localhost:10909 {}> /dev/null",
+                        "curl --proxy socks5h://localhost:10909 --connect-timeout 60 {}> /dev/null",
                         td.url
                     ))
-                })
-                .context("could not measure download time")?;
-                // Question: if run() fails, would "could not measure download time" be displayed in the logs too?
-                result_vec.push(MeasurementStruct {
-                    download_time: duration.as_millis(),
-                    timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
                 });
-
+                match duration {
+                    Ok(dur) => {
+                        // Question: if run() fails, would "could not measure download time" be displayed in the logs too?
+                        result_vec.push(MeasurementStruct {
+                            download_time: dur.as_millis(),
+                            timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                        });
+                    }
+                    Err(e) => {
+                        ureq::post(&config.collector).send_string(&format!("Failure: {}", e))?;
+                        break;
+                    }
+                }
                 // Wait a random number of seconds that averages to avg_indi
                 std::thread::sleep(Duration::from_secs(fastrand::u64(0..=(td.interval * 2))));
             }
             result_struct.data.insert(name, result_vec);
         }
-
         // Send result to data aggregation server
         let json_str =
             serde_json::to_string(&result_struct).context("could not serialize result_struct")?;
 
         ureq::post(&config.collector).send_string(&json_str)?;
         // writeln!(results_file, "{}", json_str).context("could not write result to file")?;
-
+        println!("\nresults sent!");
         // Wait a random number of seconds that averages to avg_total then re-test
         std::thread::sleep(Duration::from_secs(fastrand::u64(
             0..=(config.global_interval * 2),
@@ -151,6 +156,7 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
         .arg("--password")
         .arg(password.clone())
         .stdout(Stdio::piped())
+        .stderr(Stdio::null())
         .spawn()
         .expect("spawning geph4-client failed");
 
@@ -183,8 +189,10 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
 
     // Randomly pick an exit
     let exit = exit_list[fastrand::usize(..exit_list.len())].clone();
+    println!("\npicked our exit!");
+
+    // Connect to Geph with our exit
     loop {
-        // Connect to Geph with our exit
         let mut child = Command::new("geph4-client")
             .arg("connect")
             .arg("--username")
@@ -204,7 +212,7 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
             .stderr(Stdio::piped())
             .spawn()
             .expect("could not connect to geph");
-        eprintln!("STARTING CHILD WITH PID = {}", child.id());
+        //eprintln!("STARTING CHILD WITH PID = {}", child.id());
 
         let stderr = child.stderr.take().expect("could not get child stderr");
         let mut stderr = BufReader::new(stderr);
@@ -220,9 +228,10 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
                 child.wait().unwrap();
                 std::thread::sleep(Duration::from_secs(1));
                 break;
-            }
-            dbg!(&line);
+            };
+            //dbg!(&line);
             if line.contains("TUNNEL_MANAGER MAIN LOOP") {
+                println!("\nconnected to geph!");
                 std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
                 return (child, exit.hostname, is_plus);
             }
@@ -238,7 +247,7 @@ fn run(command: &str) -> anyhow::Result<Vec<u8>> {
         .stdout(Stdio::piped())
         // .stderr(Stdio::null())
         .spawn()?;
-    eprintln!("running command {}", command);
+    eprintln!("\nrunning command {}", command);
     let output = child.wait_with_output()?;
 
     Ok(output.stdout)
