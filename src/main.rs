@@ -1,4 +1,4 @@
-use anyhow::Context;
+use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
 use std::{
     collections::HashMap,
@@ -94,6 +94,7 @@ fn main() -> anyhow::Result<()> {
             //eprintln!("KILLLLLED!!!!! pid = {}", pid);
         });
         let time_to_connect = start.elapsed().as_millis();
+        println!("connecting to geph took {} millisecs", time_to_connect);
 
         let mut result_struct = ResultStruct {
             exit,
@@ -104,14 +105,18 @@ fn main() -> anyhow::Result<()> {
 
         // Fetch testing configuration document into a hashmap
         let config_file =
-            run("curl --proxy socks5h://localhost:10909 https://raw.githubusercontent.com/cheekyelf/geph-autotest/main/config.toml")
+            run("curl --proxy socks5h://localhost:10909 --connect-timeout 60 https://raw.githubusercontent.com/cheekyelf/geph-autotest/main/config.toml")
                 .context("could not get config file")?;
         let config: Config = toml::from_slice(&config_file).context("cannot parse TOML file")?;
 
         // Perform each test
         for (name, td) in config.endpoints.into_iter() {
-            let mut result_vec: Vec<MeasurementStruct> = Vec::new();
+            println!(
+                "downloading test file \"{}\" {} times (millisecs)",
+                name, td.iterations
+            );
 
+            let mut result_vec: Vec<MeasurementStruct> = Vec::new();
             for _ in 0..=td.iterations {
                 let duration = measure_time(|| {
                     run(&format!(
@@ -122,13 +127,14 @@ fn main() -> anyhow::Result<()> {
                 match duration {
                     Ok(dur) => {
                         // Question: if run() fails, would "could not measure download time" be displayed in the logs too?
+                        println!("{}", dur.as_millis());
                         result_vec.push(MeasurementStruct {
                             download_time: dur.as_millis(),
                             timestamp: SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
                         });
                     }
                     Err(e) => {
-                        result_struct.data_error = DataOrError::Error(e.to_string());
+                        result_struct.data_error = DataOrError::Error(format!("{:?}", e));
                         break;
                     }
                 }
@@ -140,6 +146,7 @@ fn main() -> anyhow::Result<()> {
                     datamap.insert(name, result_vec);
                 }
                 DataOrError::Error(_) => {
+                    println!("an error was encountered!");
                     break;
                 }
             }
@@ -150,7 +157,7 @@ fn main() -> anyhow::Result<()> {
 
         ureq::post(&config.collector).send_string(&json_str)?;
         // writeln!(results_file, "{}", json_str).context("could not write result to file")?;
-        println!("\nresults sent!");
+        println!("uploaded test results!\n");
         // Wait a random number of seconds that averages to avg_total then re-test
         std::thread::sleep(Duration::from_secs(fastrand::u64(
             0..=(config.global_interval * 2),
@@ -201,7 +208,7 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
 
     // Randomly pick an exit
     let exit = exit_list[fastrand::usize(..exit_list.len())].clone();
-    println!("\npicked our exit!");
+    // println!("\npicked our exit!");
 
     // Connect to Geph with our exit
     loop {
@@ -243,7 +250,6 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
             };
             //dbg!(&line);
             if line.contains("TUNNEL_MANAGER MAIN LOOP") {
-                println!("\nconnected to geph!");
                 std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
                 return (child, exit.hostname, is_plus);
             }
@@ -253,16 +259,24 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
 
 // Runs a command and returns the stdout
 fn run(command: &str) -> anyhow::Result<Vec<u8>> {
-    let child = Command::new("sh")
+    let mut child = Command::new("sh")
         .arg("-c")
         .arg(command)
         .stdout(Stdio::piped())
-        // .stderr(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()?;
-    eprintln!("\nrunning command {}", command);
-    let output = child.wait_with_output()?;
+    // eprintln!("\nrunning command {}", command);
+    let status = child.wait()?;
 
-    Ok(output.stdout)
+    if status.success() {
+        let output = child.wait_with_output()?;
+        Ok(output.stdout)
+    } else {
+        Err(anyhow!(format!(
+            "command {} exited with status {}!",
+            command, status
+        )))
+    }
 }
 
 fn measure_time(
