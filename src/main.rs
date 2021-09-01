@@ -40,7 +40,7 @@ struct ResultStruct {
 #[derive(Serialize, Clone)]
 enum DataOrError {
     Data(HashMap<String, Vec<MeasurementStruct>>),
-    Error(String),
+    Error(String, u64),
 }
 
 #[derive(Serialize, Clone, Copy)]
@@ -134,7 +134,7 @@ fn main() -> anyhow::Result<()> {
                         });
                     }
                     Err(e) => {
-                        result_struct.data_error = DataOrError::Error(format!("{:?}", e));
+                        result_struct.data_error = DataOrError::Error(format!("{:?}", e), SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
                         break;
                     }
                 }
@@ -145,7 +145,7 @@ fn main() -> anyhow::Result<()> {
                 DataOrError::Data(datamap) => {
                     datamap.insert(name, result_vec);
                 }
-                DataOrError::Error(_) => {
+                DataOrError::Error(_, _) => {
                     println!("an error was encountered!");
                     break;
                 }
