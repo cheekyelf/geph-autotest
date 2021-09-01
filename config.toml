@@ -6,12 +6,3 @@ url = "https://bing.com"
 iterations = 1
 interval = 0
 
-[endpoints.big_google]
-url = "https://dl.google.com/android/studio/maven-google-com/stable/offline-gmaven-stable.zip"
-iterations = 1
-interval = 0
-
-[endpoints.big_hetzner]
-url = "http://speed.hetzner.de/100MB.bin"
-iterations = 1
-interval = 0
