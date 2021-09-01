@@ -1,5 +1,5 @@
 collector = "https://194.182.167.15.nip.io/incoming_data"
-global_interval = 1000
+global_interval = 10000
 
 [endpoints.small]
 url = "https://bing.com"
@@ -9,9 +9,9 @@ interval = 0
 [endpoints.big_google]
 url = "https://dl.google.com/android/studio/maven-google-com/stable/offline-gmaven-stable.zip"
 iterations = 1
-interval = 5000
+interval = 0
 
 [endpoints.big_hetzner]
 url = "http://speed.hetzner.de/100MB.bin"
 iterations = 1
-interval = 5000
+interval = 0
