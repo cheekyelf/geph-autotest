@@ -112,12 +112,12 @@ fn main() -> anyhow::Result<()> {
         // Perform each test
         for (name, td) in config.endpoints.into_iter() {
             println!(
-                "downloading test file \"{}\" {} times (millisecs)",
+                "downloading test file \"{}\" {} time(s) (millisecs)",
                 name, td.iterations
             );
 
             let mut result_vec: Vec<MeasurementStruct> = Vec::new();
-            for _ in 0..=td.iterations {
+            for _ in 0..td.iterations {
                 let duration = measure_time(|| {
                     run(&format!(
                         "curl --proxy socks5h://localhost:10909 --connect-timeout 60 {}> /dev/null",
@@ -134,7 +134,11 @@ fn main() -> anyhow::Result<()> {
                         });
                     }
                     Err(e) => {
-                        result_struct.data_error = DataOrError::Error(format!("{:?}", e), SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs());
+                        println!("an error was encountered!");
+                        result_struct.data_error = DataOrError::Error(
+                            format!("{:?}", e),
+                            SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
+                        );
                         break;
                     }
                 }
@@ -146,7 +150,6 @@ fn main() -> anyhow::Result<()> {
                     datamap.insert(name, result_vec);
                 }
                 DataOrError::Error(_, _) => {
-                    println!("an error was encountered!");
                     break;
                 }
             }
