@@ -3,7 +3,7 @@ global_interval = 1000
 
 [endpoints.small]
 url = "https://bing.com"
-iterations = 5
+iterations = 1
 interval = 0
 
 [endpoints.big_google]
