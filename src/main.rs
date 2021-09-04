@@ -164,7 +164,7 @@ fn main() -> anyhow::Result<()> {
             result_struct.geph_stderr.push_str(line.as_str());
         }
 
-        println!("{}", result_struct.geph_stderr);
+        //println!("{}", result_struct.geph_stderr);
 
         // Send results to data aggregation server
         let json_str =
