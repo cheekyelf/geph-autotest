@@ -1,5 +1,7 @@
 use anyhow::{anyhow, Context};
 use serde::{Deserialize, Serialize};
+use std::process::ChildStderr;
+use std::sync::mpsc::{channel, Receiver, Sender};
 use std::{
     collections::HashMap,
     io::{self, BufRead, BufReader, Write},
@@ -36,6 +38,7 @@ struct ResultStruct {
     is_plus: bool,
     time_to_connect: u128,
     data_error: DataOrError,
+    geph_stderr: String,
 }
 #[derive(Serialize, Clone)]
 enum DataOrError {
@@ -86,7 +89,8 @@ fn main() -> anyhow::Result<()> {
     loop {
         // Connect to Geph & log exit chosen & time taken to connect
         let start = Instant::now();
-        let (mut child, exit, is_plus) = connect_to_geph(username.clone(), password.clone());
+        let (mut child, exit, is_plus, receiver) =
+            connect_to_geph(username.clone(), password.clone());
         scopeguard::defer!({
             //let pid = child.id();
             child.kill().unwrap();
@@ -101,6 +105,7 @@ fn main() -> anyhow::Result<()> {
             is_plus,
             time_to_connect,
             data_error: DataOrError::Data(HashMap::new()),
+            geph_stderr: String::new(),
         };
 
         // Fetch testing configuration document into a hashmap
@@ -126,7 +131,6 @@ fn main() -> anyhow::Result<()> {
                 });
                 match duration {
                     Ok(dur) => {
-                        // Question: if run() fails, would "could not measure download time" be displayed in the logs too?
                         println!("{}", dur.as_millis());
                         result_vec.push(MeasurementStruct {
                             download_time: dur.as_millis(),
@@ -154,7 +158,15 @@ fn main() -> anyhow::Result<()> {
                 }
             }
         }
-        // Send result to data aggregation server
+        // Add geph's stderr logs
+        while let Ok(line) = receiver.try_recv() {
+            println!("{}", line);
+            result_struct.geph_stderr.push_str(line.as_str());
+        }
+
+        println!("{}", result_struct.geph_stderr);
+
+        // Send results to data aggregation server
         let json_str =
             serde_json::to_string(&result_struct).context("could not serialize result_struct")?;
 
@@ -169,7 +181,7 @@ fn main() -> anyhow::Result<()> {
 }
 
 // Connects to Geph and returns when connection is established
-fn connect_to_geph(username: String, password: String) -> (Child, String, bool) {
+fn connect_to_geph(username: String, password: String) -> (Child, String, bool, Receiver<String>) {
     // Retrieve a list of all geph exits
     let output = Command::new("geph4-client")
         .arg("sync")
@@ -239,11 +251,14 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
         let stderr = child.stderr.take().expect("could not get child stderr");
         let mut stderr = BufReader::new(stderr);
         let mut line = String::new();
+        let (sender, receiver) = channel();
         loop {
             line.clear();
             let n = stderr
                 .read_line(&mut line)
                 .expect("could not read from child stderr");
+            sender.send(line.clone()).unwrap();
+
             if n == 0 {
                 eprintln!("OH NO RETRYING!!!!!!");
                 // child.kill().unwrap();
@@ -253,8 +268,28 @@ fn connect_to_geph(username: String, password: String) -> (Child, String, bool) 
             };
             //dbg!(&line);
             if line.contains("TUNNEL_MANAGER MAIN LOOP") {
-                std::thread::spawn(move || std::io::copy(&mut stderr, &mut std::io::sink()));
-                return (child, exit.hostname, is_plus);
+                std::thread::spawn(move || send_stderr(stderr, sender));
+                return (child, exit.hostname, is_plus, receiver);
+            }
+        }
+    }
+}
+
+// std::io::copy(&mut stderr, &mut std::io::sink())
+
+fn send_stderr(mut stderr: BufReader<ChildStderr>, sender: Sender<String>) {
+    let mut line = String::new();
+    loop {
+        line.clear();
+        match stderr.read_line(&mut line) {
+            Ok(0) => {
+                return;
+            }
+            Ok(_) => {
+                sender.send(line.clone()).unwrap();
+            }
+            Err(e) => {
+                panic!("{}", e);
             }
         }
     }
