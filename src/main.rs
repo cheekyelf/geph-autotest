@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Context};
+use anyhow::Context;
 use serde::{Deserialize, Serialize};
 use std::process::ChildStderr;
 use std::sync::mpsc::{channel, Receiver, Sender};
@@ -108,12 +108,18 @@ fn main() -> anyhow::Result<()> {
             geph_stderr: String::new(),
         };
 
-        // Fetch testing configuration document into a hashmap
-        let config_file =
-            run("curl --proxy socks5h://localhost:10909 --connect-timeout 60 https://raw.githubusercontent.com/cheekyelf/geph-autotest/main/config.toml")
-                .context("could not get config file")?;
-        let config: Config = toml::from_slice(&config_file).context("cannot parse TOML file")?;
+        let config_url =
+            "https://raw.githubusercontent.com/cheekyelf/geph-autotest/main/config.toml";
 
+        // Fetch testing configuration document into a hashmap
+        let client = reqwest::Client::builder()
+            .proxy(reqwest::Proxy::all("http://localhost:10910")?)
+            .build()?;
+
+        let rt = tokio::runtime::Runtime::new().unwrap();
+        let config_file = rt.block_on(async_download(&client, config_url))?;
+        let config: Config = toml::from_slice(&config_file).context("cannot parse TOML file")?;
+        // print!("{:?}\n", config);
         // Perform each test
         for (name, td) in config.endpoints.into_iter() {
             println!(
@@ -123,12 +129,8 @@ fn main() -> anyhow::Result<()> {
 
             let mut result_vec: Vec<MeasurementStruct> = Vec::new();
             for _ in 0..td.iterations {
-                let duration = measure_time(|| {
-                    run(&format!(
-                        "curl --proxy socks5h://localhost:10909 --connect-timeout 60 {}> /dev/null",
-                        td.url
-                    ))
-                });
+                let duration =
+                    measure_time(|| rt.block_on(async_download_no_res(&client, &td.url)));
                 match duration {
                     Ok(dur) => {
                         println!("{}", dur.as_millis());
@@ -138,7 +140,7 @@ fn main() -> anyhow::Result<()> {
                         });
                     }
                     Err(e) => {
-                        println!("an error was encountered!");
+                        println!("an error was encountered! {:?}", e);
                         result_struct.data_error = DataOrError::Error(
                             format!("{:?}", e),
                             SystemTime::now().duration_since(UNIX_EPOCH)?.as_secs(),
@@ -164,7 +166,7 @@ fn main() -> anyhow::Result<()> {
             result_struct.geph_stderr.push_str(line.as_str());
         }
 
-        //println!("{}", result_struct.geph_stderr);
+        // println!("{}", result_struct.geph_stderr);
 
         // Send results to data aggregation server
         let json_str =
@@ -178,6 +180,23 @@ fn main() -> anyhow::Result<()> {
             0..=(config.global_interval * 2),
         )));
     }
+}
+
+async fn async_download(client: &reqwest::Client, src: &str) -> anyhow::Result<Vec<u8>> {
+    let file = client
+        .get(src)
+        .timeout(Duration::from_secs(60))
+        .send()
+        .await?
+        .bytes()
+        .await?;
+    Ok(file.to_vec())
+}
+
+async fn async_download_no_res(client: &reqwest::Client, src: &str) -> anyhow::Result<()> {
+    let mut res = client.get(src).send().await?;
+    while res.chunk().await?.is_some() {}
+    Ok(())
 }
 
 // Connects to Geph and returns when connection is established
@@ -295,31 +314,29 @@ fn send_stderr(mut stderr: BufReader<ChildStderr>, sender: Sender<String>) {
     }
 }
 
-// Runs a command and returns the stdout
-fn run(command: &str) -> anyhow::Result<Vec<u8>> {
-    let mut child = Command::new("sh")
-        .arg("-c")
-        .arg(command)
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()?;
-    // eprintln!("\nrunning command {}", command);
-    let status = child.wait()?;
+// // Runs a command and returns the stdout
+// fn run(command: &str) -> anyhow::Result<Vec<u8>> {
+//     let mut child = Command::new("sh")
+//         .arg("-c")
+//         .arg(command)
+//         .stdout(Stdio::piped())
+//         .stderr(Stdio::null())
+//         .spawn()?;
+//     // eprintln!("\nrunning command {}", command);
+//     let status = child.wait()?;
 
-    if status.success() {
-        let output = child.wait_with_output()?;
-        Ok(output.stdout)
-    } else {
-        Err(anyhow!(format!(
-            "command {} exited with status {}!",
-            command, status
-        )))
-    }
-}
+//     if status.success() {
+//         let output = child.wait_with_output()?;
+//         Ok(output.stdout)
+//     } else {
+//         Err(anyhow!(format!(
+//             "command {} exited with status {}!",
+//             command, status
+//         )))
+//     }
+// }
 
-fn measure_time(
-    f: impl FnOnce() -> Result<Vec<u8>, anyhow::Error>,
-) -> Result<Duration, anyhow::Error> {
+fn measure_time(f: impl FnOnce() -> Result<(), anyhow::Error>) -> Result<Duration, anyhow::Error> {
     let start = Instant::now();
     f().context("could not download test file")?;
     Ok(start.elapsed())
