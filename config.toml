@@ -3,15 +3,20 @@ global_interval = 1000
 
 [endpoints.small]
 url = "https://bing.com"
+iterations = 5
+interval = 0
+
+[endpoints.ipfs-1mb]
+url = "https://cloudflare-ipfs.com/ipfs/QmVkbauSDEaMP4Tkq6Epm9uW75mWm136n81YH8fGtfwdHU"
 iterations = 1
 interval = 0
 
-[endpoints.big_google]
-url = "https://dl.google.com/android/studio/maven-google-com/stable/offline-gmaven-stable.zip"
+[endpoints.ipfs-5mb]
+url = "https://cloudflare-ipfs.com/ipfs/QmS2s8GRYHEurXL7V1zUtKvf2H1BGcQc5NN1T1hiSnWvbd"
 iterations = 1
 interval = 0
 
-[endpoints.big_hetzner]
-url = "http://speed.hetzner.de/100MB.bin"
+[endpoints.ipfs-20mb]
+url = "https://cloudflare-ipfs.com/ipfs/QmPxHUfEJxvT6DjvCgExuSRkhxbrHgC4UHSX8yDgY1VQ2p"
 iterations = 1
 interval = 0
